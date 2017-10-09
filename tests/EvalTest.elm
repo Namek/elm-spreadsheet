@@ -20,17 +20,22 @@ caseList =
     ]
 
 
+caseListTests : List Test
+caseListTests =
+    List.concatMap
+        (\{ expr, rpn, val } ->
+            [ test ("test conversion to RPN: " ++ expr) <|
+                \() ->
+                    Ok rpn |> Expect.equal (exprToRpn expr)
+            , test ("calculate value: " ++ rpn) <|
+                \() ->
+                    Ok val |> Expect.equal (evaluateExpression (always Nothing) expr)
+            ]
+        )
+        caseList
+
+
 suite : Test
 suite =
-    describe "evaluate formulas"
-        [ test "test conversion to RPN" <|
-            \() ->
-                Expect.equalLists
-                    (List.map (\{ rpn } -> Ok rpn) caseList)
-                    (List.map (\{ expr } -> exprToRpn expr) caseList)
-        , test "calculate value" <|
-            \() ->
-                Expect.equalLists
-                    (List.map (\{ val } -> Ok val) caseList)
-                    (List.map (\{ expr } -> evaluateExpression (always Nothing) expr) caseList)
-        ]
+    describe "test formulas" <|
+        caseListTests
