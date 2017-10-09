@@ -2,6 +2,7 @@ module Main exposing (..)
 
 import Char
 import Dict exposing (Dict)
+import Eval exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onBlur, onFocus, onInput)

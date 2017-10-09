@@ -13,6 +13,7 @@ type RpnOp
     | OpSub
     | OpMul
     | OpDiv
+    | OpPow -- power (exponentation)
 
 
 type Token
@@ -73,6 +74,9 @@ evalOpToStr op =
                 OpDiv ->
                     "/"
 
+                OpPow ->
+                    "^"
+
 
 tokenizeExpr : String -> Result String (List Token)
 tokenizeExpr expr =
@@ -102,6 +106,8 @@ tokenizeExpr expr =
                 ( "", TOperator OpMul :: finalizeCurString cur acc_tokens )
             else if char == '/' then
                 ( "", TOperator OpDiv :: finalizeCurString cur acc_tokens )
+            else if char == '^' then
+                ( "", TOperator OpPow :: finalizeCurString cur acc_tokens )
             else if char == '(' then
                 ( "", TParenthesisOpen :: finalizeCurString cur acc_tokens )
             else if char == ')' then
@@ -143,21 +149,33 @@ exprToOperations expr =
                                     loop stack ops =
                                         case Stack.pop stack of
                                             ( Just TParenthesisOpen, newStack ) ->
-                                                loop newStack (repackTokenToEvalOperation token :: ops)
-
-                                            ( _, newStack ) ->
                                                 ( newStack, ops )
+
+                                            ( Just (TOperator op), newStack ) ->
+                                                loop newStack (DoMath op :: ops)
+
+                                            _ ->
+                                                ( stack, ops )
                                 in
                                 loop stack ops
 
                             TOperator op ->
                                 -- move all operators from the top of the stack to output
-                                -- TODO operator priorities
                                 let
+                                    opPrior =
+                                        opPriority op
+
                                     loop stack ops =
                                         case Stack.pop stack of
-                                            ( Just (TOperator token_), newStack ) ->
-                                                loop newStack (DoMath token_ :: ops)
+                                            ( Just (TOperator op1), newStack ) ->
+                                                let
+                                                    op1Prior =
+                                                        opPriority op1
+                                                in
+                                                if (opLeftAssociative op && op1Prior >= opPrior) || (not (opLeftAssociative op) && op1Prior > opPrior) then
+                                                    loop newStack (DoMath op1 :: ops)
+                                                else
+                                                    ( stack, ops )
 
                                             _ ->
                                                 ( stack, ops )
@@ -189,7 +207,8 @@ unpackTokenOp token =
             rpnOp
 
         _ ->
-            Debug.crash "only operators are allowed to be here"
+            Debug.crash <|
+                "only operators are allowed to be here"
 
 
 repackTokenToEvalOperation : Token -> EvalOperation
@@ -246,7 +265,7 @@ evalOpsToValue getter ops =
                         ( Just (TmpNumber n1), Just (TmpNumber n2) ) ->
                             let
                                 val =
-                                    doTheActualMath op n1 n2
+                                    doTheActualMath op n2 n1
 
                                 stack3 =
                                     Stack.push (val |> TmpNumber) stack2
@@ -283,6 +302,9 @@ doTheActualMath rpnOp n1 n2 =
 
                 OpDiv ->
                     (/)
+
+                OpPow ->
+                    (^)
     in
     op n1 n2
 
@@ -302,7 +324,20 @@ opPriority rpnOp =
         OpDiv ->
             2
 
+        OpPow ->
+            3
 
-hasLowerPriorityThan : RpnOp -> RpnOp -> Bool
-hasLowerPriorityThan op1 op2 =
-    opPriority op1 < opPriority op2
+
+hasHigherPriorityThan : RpnOp -> RpnOp -> Bool
+hasHigherPriorityThan op1 op2 =
+    opPriority op2 > opPriority op1
+
+
+opLeftAssociative : RpnOp -> Bool
+opLeftAssociative op =
+    case op of
+        OpPow ->
+            False
+
+        _ ->
+            True
